@@ -1,7 +1,7 @@
 package com.arazhafez.academe.controller;
 
+import com.arazhafez.academe.dto.CourseResponse;
 import com.arazhafez.academe.dto.CreateCourseRequest;
-import com.arazhafez.academe.entity.Course;
 import com.arazhafez.academe.service.CourseService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -9,6 +9,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/courses")
@@ -22,14 +24,14 @@ public class CourseController {
 
     @PostMapping
     @PreAuthorize("hasRole('INSTRUCTOR')")
-    public ResponseEntity<Course> createCourse(
+    public ResponseEntity<CourseResponse> createCourse(
             @Valid @RequestBody CreateCourseRequest request,
             Authentication authentication) {
 
-        //Email comes from the authenticated JWT
+        //Get the logged-in instructor's email from the JWT
         String instructorEmail = authentication.getName();
 
-        Course createdCourse =
+        CourseResponse createdCourse =
                 courseService.createCourse(
                         request,
                         instructorEmail
@@ -38,5 +40,24 @@ public class CourseController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(createdCourse);
+    }
+
+    @GetMapping
+    public ResponseEntity<List<CourseResponse>> getAllCourses() {
+
+        List<CourseResponse> courses =
+                courseService.getAllCourses();
+
+        return ResponseEntity.ok(courses);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<CourseResponse> getCourseById(
+            @PathVariable Long id) {
+
+        CourseResponse course =
+                courseService.getCourseById(id);
+
+        return ResponseEntity.ok(course);
     }
 }
