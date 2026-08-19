@@ -36,7 +36,6 @@ public class CourseService {
                         new IllegalArgumentException("Instructor not found")
                 );
 
-        //Only instructors are allowed to create courses
         if (instructor.getRole() != Role.INSTRUCTOR) {
             throw new IllegalArgumentException(
                     "Only instructors can create courses"
@@ -62,29 +61,92 @@ public class CourseService {
         Course course = new Course();
 
         course.setCourseCode(
-                request.getCourseCode().trim().toUpperCase()
+                request.getCourseCode()
+                        .trim()
+                        .toUpperCase()
         );
 
-        course.setTitle(request.getTitle().trim());
-        course.setDescription(request.getDescription());
-        course.setSemester(request.getSemester().trim());
-        course.setCredits(request.getCredits());
+        course.setTitle(
+                request.getTitle().trim()
+        );
+
+        course.setDescription(
+                request.getDescription()
+        );
+
+        course.setSemester(
+                request.getSemester().trim()
+        );
+
+        course.setCredits(
+                request.getCredits()
+        );
 
         course.setJoinCode(
-                request.getJoinCode().trim().toUpperCase()
+                request.getJoinCode()
+                        .trim()
+                        .toUpperCase()
         );
 
-        //Attach the course to the authenticated instructor
+        //Attach course to the logged-in instructor
         course.setInstructor(instructor);
 
-        //Save the entity first
-        Course savedCourse = courseRepository.save(course);
+        Course savedCourse =
+                courseRepository.save(course);
 
-        //Then convert it into a clean API response DTO
         return toCourseResponse(savedCourse);
     }
 
-    private CourseResponse toCourseResponse(Course course) {
+    public List<CourseResponse> getAllCourses() {
+
+        return courseRepository
+                .findAll()
+                .stream()
+                .map(this::toCourseResponse)
+                .toList();
+    }
+
+    public CourseResponse getCourseById(Long id) {
+
+        Course course = courseRepository
+                .findById(id)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Course not found"
+                        )
+                );
+
+        return toCourseResponse(course);
+    }
+
+    public List<CourseResponse> getMyCourses(
+            String instructorEmail) {
+
+        //Find the logged-in instructor
+        User instructor = userRepository
+                .findByEmail(instructorEmail)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Instructor not found"
+                        )
+                );
+
+        if (instructor.getRole() != Role.INSTRUCTOR) {
+            throw new IllegalArgumentException(
+                    "Only instructors can view their courses"
+            );
+        }
+
+        return courseRepository
+                .findByInstructorId(instructor.getId())
+                .stream()
+                .map(this::toCourseResponse)
+                .toList();
+    }
+
+    //Convert Course entity into the DTO returned by the API
+    private CourseResponse toCourseResponse(
+            Course course) {
 
         return new CourseResponse(
                 course.getId(),
@@ -94,28 +156,12 @@ public class CourseService {
                 course.getSemester(),
                 course.getCredits(),
                 course.getJoinCode(),
+
                 course.getInstructor().getId(),
                 course.getInstructor().getFirstName(),
                 course.getInstructor().getLastName(),
+
                 course.getCreatedAt()
         );
-    }
-
-    public List<CourseResponse> getAllCourses() {
-
-        return courseRepository.findAll()
-                .stream()
-                .map(this::toCourseResponse)
-                .toList();
-    }
-
-    public CourseResponse getCourseById(Long id) {
-
-        Course course = courseRepository.findById(id)
-                .orElseThrow(() ->
-                        new IllegalArgumentException("Course not found")
-                );
-
-        return toCourseResponse(course);
     }
 }

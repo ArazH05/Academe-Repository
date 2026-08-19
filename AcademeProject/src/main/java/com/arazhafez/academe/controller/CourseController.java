@@ -18,18 +18,21 @@ public class CourseController {
 
     private final CourseService courseService;
 
-    public CourseController(CourseService courseService) {
+    public CourseController(
+            CourseService courseService) {
+
         this.courseService = courseService;
     }
 
+    //Instructor creates a new course
     @PostMapping
     @PreAuthorize("hasRole('INSTRUCTOR')")
     public ResponseEntity<CourseResponse> createCourse(
             @Valid @RequestBody CreateCourseRequest request,
             Authentication authentication) {
 
-        //Get the logged-in instructor's email from the JWT
-        String instructorEmail = authentication.getName();
+        String instructorEmail =
+                authentication.getName();
 
         CourseResponse createdCourse =
                 courseService.createCourse(
@@ -42,6 +45,7 @@ public class CourseController {
                 .body(createdCourse);
     }
 
+    //Get all courses
     @GetMapping
     public ResponseEntity<List<CourseResponse>> getAllCourses() {
 
@@ -51,6 +55,24 @@ public class CourseController {
         return ResponseEntity.ok(courses);
     }
 
+    //Instructor gets only their own courses
+    @GetMapping("/mine")
+    @PreAuthorize("hasRole('INSTRUCTOR')")
+    public ResponseEntity<List<CourseResponse>> getMyCourses(
+            Authentication authentication) {
+
+        String instructorEmail =
+                authentication.getName();
+
+        List<CourseResponse> courses =
+                courseService.getMyCourses(
+                        instructorEmail
+                );
+
+        return ResponseEntity.ok(courses);
+    }
+
+    //Get one course by its ID
     @GetMapping("/{id}")
     public ResponseEntity<CourseResponse> getCourseById(
             @PathVariable Long id) {
