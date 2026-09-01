@@ -2,6 +2,7 @@ package com.arazhafez.academe.service;
 
 import com.arazhafez.academe.dto.CourseResponse;
 import com.arazhafez.academe.dto.CreateCourseRequest;
+import com.arazhafez.academe.dto.UpdateCourseRequest;
 import com.arazhafez.academe.entity.Course;
 import com.arazhafez.academe.entity.User;
 import com.arazhafez.academe.enums.Role;
@@ -42,17 +43,21 @@ public class CourseService {
             );
         }
 
-        if (courseRepository.existsByCourseCode(
-                request.getCourseCode())) {
+        String courseCode = request.getCourseCode()
+                .trim()
+                .toUpperCase();
 
+        String joinCode = request.getJoinCode()
+                .trim()
+                .toUpperCase();
+
+        if (courseRepository.existsByCourseCode(courseCode)) {
             throw new IllegalArgumentException(
                     "Course code already exists"
             );
         }
 
-        if (courseRepository.existsByJoinCode(
-                request.getJoinCode())) {
-
+        if (courseRepository.existsByJoinCode(joinCode)) {
             throw new IllegalArgumentException(
                     "Join code already exists"
             );
@@ -60,33 +65,12 @@ public class CourseService {
 
         Course course = new Course();
 
-        course.setCourseCode(
-                request.getCourseCode()
-                        .trim()
-                        .toUpperCase()
-        );
-
-        course.setTitle(
-                request.getTitle().trim()
-        );
-
-        course.setDescription(
-                request.getDescription()
-        );
-
-        course.setSemester(
-                request.getSemester().trim()
-        );
-
-        course.setCredits(
-                request.getCredits()
-        );
-
-        course.setJoinCode(
-                request.getJoinCode()
-                        .trim()
-                        .toUpperCase()
-        );
+        course.setCourseCode(courseCode);
+        course.setTitle(request.getTitle().trim());
+        course.setDescription(request.getDescription());
+        course.setSemester(request.getSemester().trim());
+        course.setCredits(request.getCredits());
+        course.setJoinCode(joinCode);
 
         //Attach course to the logged-in instructor
         course.setInstructor(instructor);
@@ -142,6 +126,83 @@ public class CourseService {
                 .stream()
                 .map(this::toCourseResponse)
                 .toList();
+    }
+
+    public CourseResponse updateCourse(
+            Long courseId,
+            UpdateCourseRequest request,
+            String instructorEmail) {
+
+        //Find the logged-in instructor
+        User instructor = userRepository
+                .findByEmail(instructorEmail)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Instructor not found"
+                        )
+                );
+
+        if (instructor.getRole() != Role.INSTRUCTOR) {
+            throw new IllegalArgumentException(
+                    "Only instructors can update courses"
+            );
+        }
+
+        //Find the course being updated
+        Course course = courseRepository
+                .findById(courseId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Course not found"
+                        )
+                );
+
+        //Make sure the logged-in instructor owns the course
+        if (!course.getInstructor().getId()
+                .equals(instructor.getId())) {
+
+            throw new IllegalArgumentException(
+                    "You are not the instructor of this course"
+            );
+        }
+
+        String courseCode = request.getCourseCode()
+                .trim()
+                .toUpperCase();
+
+        String joinCode = request.getJoinCode()
+                .trim()
+                .toUpperCase();
+
+        //Only check for duplicates if the course code is changing
+        if (!course.getCourseCode().equals(courseCode)
+                && courseRepository.existsByCourseCode(courseCode)) {
+
+            throw new IllegalArgumentException(
+                    "Course code already exists"
+            );
+        }
+
+        //Only check for duplicates if the join code is changing
+        if (!course.getJoinCode().equals(joinCode)
+                && courseRepository.existsByJoinCode(joinCode)) {
+
+            throw new IllegalArgumentException(
+                    "Join code already exists"
+            );
+        }
+
+        course.setCourseCode(courseCode);
+        course.setTitle(request.getTitle().trim());
+        course.setDescription(request.getDescription());
+        course.setSemester(request.getSemester().trim());
+        course.setCredits(request.getCredits());
+        course.setJoinCode(joinCode);
+
+        Course updatedCourse =
+                courseRepository.save(course);
+
+        return toCourseResponse(updatedCourse);
     }
 
     //Convert Course entity into the DTO returned by the API

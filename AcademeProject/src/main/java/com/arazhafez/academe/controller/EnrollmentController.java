@@ -57,4 +57,22 @@ public class EnrollmentController {
 
         return ResponseEntity.ok(enrollments);
     }
+
+    @DeleteMapping("/{courseId}")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<Void> leaveCourse(
+            @PathVariable Long courseId,
+            Authentication authentication) {
+
+        //Identify the student from the JWT
+        String studentEmail = authentication.getName();
+
+        enrollmentService.leaveCourse(
+                courseId,
+                studentEmail
+        );
+
+        //Successful deletion with no response body
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -74,12 +74,107 @@ public class EnrollmentService {
         enrollment.setStudent(student);
         enrollment.setCourse(course);
 
-        //Save the enrollment first
         Enrollment savedEnrollment =
                 enrollmentRepository.save(enrollment);
 
-        //Return a clean DTO instead of the entity
         return toEnrollmentResponse(savedEnrollment);
+    }
+
+    public List<EnrollmentResponse> getMyEnrollments(
+            String studentEmail) {
+
+        //Find the logged-in student
+        User student = userRepository
+                .findByEmail(studentEmail)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Student not found")
+                );
+
+        if (student.getRole() != Role.STUDENT) {
+            throw new IllegalArgumentException(
+                    "Only students can view their enrollments"
+            );
+        }
+
+        return enrollmentRepository
+                .findByStudentId(student.getId())
+                .stream()
+                .map(this::toEnrollmentResponse)
+                .toList();
+    }
+
+    public List<EnrollmentResponse> getCourseStudents(
+            Long courseId,
+            String instructorEmail) {
+
+        //Find the logged-in instructor
+        User instructor = userRepository
+                .findByEmail(instructorEmail)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Instructor not found")
+                );
+
+        if (instructor.getRole() != Role.INSTRUCTOR) {
+            throw new IllegalArgumentException(
+                    "Only instructors can view course students"
+            );
+        }
+
+        //Find the requested course
+        Course course = courseRepository
+                .findById(courseId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Course not found")
+                );
+
+        //Make sure this instructor owns the course
+        if (!course.getInstructor().getId()
+                .equals(instructor.getId())) {
+
+            throw new IllegalArgumentException(
+                    "You are not the instructor of this course"
+            );
+        }
+
+        //Return all students enrolled in the course
+        return enrollmentRepository
+                .findByCourseId(courseId)
+                .stream()
+                .map(this::toEnrollmentResponse)
+                .toList();
+    }
+
+    public void leaveCourse(
+            Long courseId,
+            String studentEmail) {
+
+        //Find the logged-in student
+        User student = userRepository
+                .findByEmail(studentEmail)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Student not found")
+                );
+
+        if (student.getRole() != Role.STUDENT) {
+            throw new IllegalArgumentException(
+                    "Only students can leave courses"
+            );
+        }
+
+        //Find this student's enrollment in the requested course
+        Enrollment enrollment = enrollmentRepository
+                .findByStudentIdAndCourseId(
+                        student.getId(),
+                        courseId
+                )
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "You are not enrolled in this course"
+                        )
+                );
+
+        //Delete only this student's enrollment
+        enrollmentRepository.delete(enrollment);
     }
 
     private EnrollmentResponse toEnrollmentResponse(
@@ -99,26 +194,5 @@ public class EnrollmentService {
 
                 enrollment.getEnrolledAt()
         );
-    }
-
-    public List<EnrollmentResponse> getMyEnrollments(String studentEmail) {
-
-        User student = userRepository
-                .findByEmail(studentEmail)
-                .orElseThrow(() ->
-                        new IllegalArgumentException("Student not found")
-                );
-
-        if (student.getRole() != Role.STUDENT) {
-            throw new IllegalArgumentException(
-                    "Only students can view their enrollments"
-            );
-        }
-
-        return enrollmentRepository
-                .findByStudentId(student.getId())
-                .stream()
-                .map(this::toEnrollmentResponse)
-                .toList();
     }
 }
