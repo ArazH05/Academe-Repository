@@ -6,6 +6,9 @@ import com.arazhafez.academe.entity.Course;
 import com.arazhafez.academe.entity.Enrollment;
 import com.arazhafez.academe.entity.User;
 import com.arazhafez.academe.enums.Role;
+import com.arazhafez.academe.exception.BadRequestException;
+import com.arazhafez.academe.exception.ForbiddenException;
+import com.arazhafez.academe.exception.ResourceNotFoundException;
 import com.arazhafez.academe.repository.CourseRepository;
 import com.arazhafez.academe.repository.EnrollmentRepository;
 import com.arazhafez.academe.repository.UserRepository;
@@ -34,16 +37,16 @@ public class EnrollmentService {
             JoinCourseRequest request,
             String studentEmail) {
 
-        //Find the logged-in student
         User student = userRepository
                 .findByEmail(studentEmail)
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Student not found")
+                        new ResourceNotFoundException(
+                                "Student not found"
+                        )
                 );
 
-        //Only students are allowed to enroll
         if (student.getRole() != Role.STUDENT) {
-            throw new IllegalArgumentException(
+            throw new ForbiddenException(
                     "Only students can join courses"
             );
         }
@@ -52,19 +55,19 @@ public class EnrollmentService {
                 .trim()
                 .toUpperCase();
 
-        //Find the course using the join code
         Course course = courseRepository
                 .findByJoinCode(joinCode)
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Invalid join code")
+                        new BadRequestException(
+                                "Invalid join code"
+                        )
                 );
 
-        //Prevent duplicate enrollment
         if (enrollmentRepository.existsByStudentIdAndCourseId(
                 student.getId(),
                 course.getId())) {
 
-            throw new IllegalArgumentException(
+            throw new BadRequestException(
                     "You are already enrolled in this course"
             );
         }
@@ -83,15 +86,16 @@ public class EnrollmentService {
     public List<EnrollmentResponse> getMyEnrollments(
             String studentEmail) {
 
-        //Find the logged-in student
         User student = userRepository
                 .findByEmail(studentEmail)
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Student not found")
+                        new ResourceNotFoundException(
+                                "Student not found"
+                        )
                 );
 
         if (student.getRole() != Role.STUDENT) {
-            throw new IllegalArgumentException(
+            throw new ForbiddenException(
                     "Only students can view their enrollments"
             );
         }
@@ -107,36 +111,36 @@ public class EnrollmentService {
             Long courseId,
             String instructorEmail) {
 
-        //Find the logged-in instructor
         User instructor = userRepository
                 .findByEmail(instructorEmail)
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Instructor not found")
+                        new ResourceNotFoundException(
+                                "Instructor not found"
+                        )
                 );
 
         if (instructor.getRole() != Role.INSTRUCTOR) {
-            throw new IllegalArgumentException(
+            throw new ForbiddenException(
                     "Only instructors can view course students"
             );
         }
 
-        //Find the requested course
         Course course = courseRepository
                 .findById(courseId)
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Course not found")
+                        new ResourceNotFoundException(
+                                "Course not found"
+                        )
                 );
 
-        //Make sure this instructor owns the course
         if (!course.getInstructor().getId()
                 .equals(instructor.getId())) {
 
-            throw new IllegalArgumentException(
+            throw new ForbiddenException(
                     "You are not the instructor of this course"
             );
         }
 
-        //Return all students enrolled in the course
         return enrollmentRepository
                 .findByCourseId(courseId)
                 .stream()
@@ -148,32 +152,31 @@ public class EnrollmentService {
             Long courseId,
             String studentEmail) {
 
-        //Find the logged-in student
         User student = userRepository
                 .findByEmail(studentEmail)
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Student not found")
+                        new ResourceNotFoundException(
+                                "Student not found"
+                        )
                 );
 
         if (student.getRole() != Role.STUDENT) {
-            throw new IllegalArgumentException(
+            throw new ForbiddenException(
                     "Only students can leave courses"
             );
         }
 
-        //Find this student's enrollment in the requested course
         Enrollment enrollment = enrollmentRepository
                 .findByStudentIdAndCourseId(
                         student.getId(),
                         courseId
                 )
                 .orElseThrow(() ->
-                        new IllegalArgumentException(
+                        new ResourceNotFoundException(
                                 "You are not enrolled in this course"
                         )
                 );
 
-        //Delete only this student's enrollment
         enrollmentRepository.delete(enrollment);
     }
 

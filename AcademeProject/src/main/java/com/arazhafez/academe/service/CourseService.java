@@ -6,9 +6,14 @@ import com.arazhafez.academe.dto.UpdateCourseRequest;
 import com.arazhafez.academe.entity.Course;
 import com.arazhafez.academe.entity.User;
 import com.arazhafez.academe.enums.Role;
+import com.arazhafez.academe.exception.BadRequestException;
+import com.arazhafez.academe.exception.ForbiddenException;
+import com.arazhafez.academe.exception.ResourceNotFoundException;
 import com.arazhafez.academe.repository.CourseRepository;
+import com.arazhafez.academe.repository.EnrollmentRepository;
 import com.arazhafez.academe.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -17,28 +22,32 @@ public class CourseService {
 
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
+    private final EnrollmentRepository enrollmentRepository;
 
     public CourseService(
             CourseRepository courseRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            EnrollmentRepository enrollmentRepository) {
 
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
+        this.enrollmentRepository = enrollmentRepository;
     }
 
     public CourseResponse createCourse(
             CreateCourseRequest request,
             String instructorEmail) {
 
-        //Find the logged-in instructor
         User instructor = userRepository
                 .findByEmail(instructorEmail)
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Instructor not found")
+                        new ResourceNotFoundException(
+                                "Instructor not found"
+                        )
                 );
 
         if (instructor.getRole() != Role.INSTRUCTOR) {
-            throw new IllegalArgumentException(
+            throw new ForbiddenException(
                     "Only instructors can create courses"
             );
         }
@@ -52,13 +61,13 @@ public class CourseService {
                 .toUpperCase();
 
         if (courseRepository.existsByCourseCode(courseCode)) {
-            throw new IllegalArgumentException(
+            throw new BadRequestException(
                     "Course code already exists"
             );
         }
 
         if (courseRepository.existsByJoinCode(joinCode)) {
-            throw new IllegalArgumentException(
+            throw new BadRequestException(
                     "Join code already exists"
             );
         }
@@ -71,8 +80,6 @@ public class CourseService {
         course.setSemester(request.getSemester().trim());
         course.setCredits(request.getCredits());
         course.setJoinCode(joinCode);
-
-        //Attach course to the logged-in instructor
         course.setInstructor(instructor);
 
         Course savedCourse =
@@ -95,7 +102,7 @@ public class CourseService {
         Course course = courseRepository
                 .findById(id)
                 .orElseThrow(() ->
-                        new IllegalArgumentException(
+                        new ResourceNotFoundException(
                                 "Course not found"
                         )
                 );
@@ -106,17 +113,16 @@ public class CourseService {
     public List<CourseResponse> getMyCourses(
             String instructorEmail) {
 
-        //Find the logged-in instructor
         User instructor = userRepository
                 .findByEmail(instructorEmail)
                 .orElseThrow(() ->
-                        new IllegalArgumentException(
+                        new ResourceNotFoundException(
                                 "Instructor not found"
                         )
                 );
 
         if (instructor.getRole() != Role.INSTRUCTOR) {
-            throw new IllegalArgumentException(
+            throw new ForbiddenException(
                     "Only instructors can view their courses"
             );
         }
@@ -133,35 +139,32 @@ public class CourseService {
             UpdateCourseRequest request,
             String instructorEmail) {
 
-        //Find the logged-in instructor
         User instructor = userRepository
                 .findByEmail(instructorEmail)
                 .orElseThrow(() ->
-                        new IllegalArgumentException(
+                        new ResourceNotFoundException(
                                 "Instructor not found"
                         )
                 );
 
         if (instructor.getRole() != Role.INSTRUCTOR) {
-            throw new IllegalArgumentException(
+            throw new ForbiddenException(
                     "Only instructors can update courses"
             );
         }
 
-        //Find the course being updated
         Course course = courseRepository
                 .findById(courseId)
                 .orElseThrow(() ->
-                        new IllegalArgumentException(
+                        new ResourceNotFoundException(
                                 "Course not found"
                         )
                 );
 
-        //Make sure the logged-in instructor owns the course
         if (!course.getInstructor().getId()
                 .equals(instructor.getId())) {
 
-            throw new IllegalArgumentException(
+            throw new ForbiddenException(
                     "You are not the instructor of this course"
             );
         }
@@ -174,20 +177,18 @@ public class CourseService {
                 .trim()
                 .toUpperCase();
 
-        //Only check for duplicates if the course code is changing
         if (!course.getCourseCode().equals(courseCode)
                 && courseRepository.existsByCourseCode(courseCode)) {
 
-            throw new IllegalArgumentException(
+            throw new BadRequestException(
                     "Course code already exists"
             );
         }
 
-        //Only check for duplicates if the join code is changing
         if (!course.getJoinCode().equals(joinCode)
                 && courseRepository.existsByJoinCode(joinCode)) {
 
-            throw new IllegalArgumentException(
+            throw new BadRequestException(
                     "Join code already exists"
             );
         }
@@ -205,7 +206,48 @@ public class CourseService {
         return toCourseResponse(updatedCourse);
     }
 
-    //Convert Course entity into the DTO returned by the API
+    @Transactional
+    public void deleteCourse(
+            Long courseId,
+            String instructorEmail) {
+
+        User instructor = userRepository
+                .findByEmail(instructorEmail)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Instructor not found"
+                        )
+                );
+
+        if (instructor.getRole() != Role.INSTRUCTOR) {
+            throw new ForbiddenException(
+                    "Only instructors can delete courses"
+            );
+        }
+
+        Course course = courseRepository
+                .findById(courseId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Course not found"
+                        )
+                );
+
+        if (!course.getInstructor().getId()
+                .equals(instructor.getId())) {
+
+            throw new ForbiddenException(
+                    "You are not the instructor of this course"
+            );
+        }
+
+        enrollmentRepository.deleteAll(
+                enrollmentRepository.findByCourseId(courseId)
+        );
+
+        courseRepository.delete(course);
+    }
+
     private CourseResponse toCourseResponse(
             Course course) {
 

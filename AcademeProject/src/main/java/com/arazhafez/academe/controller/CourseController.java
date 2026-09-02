@@ -118,6 +118,24 @@ public class CourseController {
         return ResponseEntity.ok(updatedCourse);
     }
 
+    //Instructor deletes one of their own courses
+    @DeleteMapping("/{courseId}")
+    @PreAuthorize("hasRole('INSTRUCTOR')")
+    public ResponseEntity<Void> deleteCourse(
+            @PathVariable Long courseId,
+            Authentication authentication) {
+
+        String instructorEmail =
+                authentication.getName();
+
+        courseService.deleteCourse(
+                courseId,
+                instructorEmail
+        );
+
+        return ResponseEntity.noContent().build();
+    }
+
     //Get one course by its ID
     @GetMapping("/{id}")
     public ResponseEntity<CourseResponse> getCourseById(

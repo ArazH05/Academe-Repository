@@ -21,8 +21,9 @@ public class AuthController {
     private final UserService userService;
     private final AuthService authService;
 
-    public AuthController(UserService userService,
-                          AuthService authService) {
+    public AuthController(
+            UserService userService,
+            AuthService authService) {
 
         this.userService = userService;
         this.authService = authService;
@@ -32,8 +33,8 @@ public class AuthController {
     public ResponseEntity<User> register(
             @Valid @RequestBody RegisterRequest request) {
 
-        //Create and save a new account
-        User registeredUser = userService.registerUser(request);
+        User registeredUser =
+                userService.registerUser(request);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -44,8 +45,8 @@ public class AuthController {
     public ResponseEntity<LoginResponse> login(
             @Valid @RequestBody LoginRequest request) {
 
-        //Validate credentials and generate a JWT
-        LoginResponse response = authService.login(request);
+        LoginResponse response =
+                authService.login(request);
 
         return ResponseEntity.ok(response);
     }

@@ -2,6 +2,9 @@ package com.arazhafez.academe.service;
 
 import com.arazhafez.academe.dto.RegisterRequest;
 import com.arazhafez.academe.entity.User;
+import com.arazhafez.academe.enums.Role;
+import com.arazhafez.academe.exception.BadRequestException;
+import com.arazhafez.academe.exception.ResourceNotFoundException;
 import com.arazhafez.academe.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -12,8 +15,9 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository,
-                       PasswordEncoder passwordEncoder) {
+    public UserService(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder) {
 
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -21,28 +25,52 @@ public class UserService {
 
     public User registerUser(RegisterRequest request) {
 
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("An account with this email already exists");
+        String email = request.getEmail()
+                .trim()
+                .toLowerCase();
+
+        if (userRepository.existsByEmail(email)) {
+            throw new BadRequestException(
+                    "Email is already registered"
+            );
         }
 
         User user = new User();
 
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setEmail(request.getEmail().toLowerCase());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(request.getRole());
+        user.setFirstName(
+                request.getFirstName().trim()
+        );
+
+        user.setLastName(
+                request.getLastName().trim()
+        );
+
+        user.setEmail(email);
+
+        user.setPassword(
+                passwordEncoder.encode(
+                        request.getPassword()
+                )
+        );
+
+        // Public registration always creates a student
+        user.setRole(Role.STUDENT);
 
         return userRepository.save(user);
     }
 
-    //added this:
     public User getUserByEmail(String email) {
 
-        //Find the currently authenticated user
-        return userRepository.findByEmail(email)
+        String normalizedEmail = email
+                .trim()
+                .toLowerCase();
+
+        return userRepository
+                .findByEmail(normalizedEmail)
                 .orElseThrow(() ->
-                        new IllegalArgumentException("User not found")
+                        new ResourceNotFoundException(
+                                "User not found"
+                        )
                 );
     }
 }
