@@ -3,6 +3,7 @@ package com.arazhafez.academe.controller;
 import com.arazhafez.academe.dto.CourseResponse;
 import com.arazhafez.academe.dto.CreateCourseRequest;
 import com.arazhafez.academe.dto.EnrollmentResponse;
+import com.arazhafez.academe.dto.InstructorCourseResponse;
 import com.arazhafez.academe.dto.UpdateCourseRequest;
 import com.arazhafez.academe.service.CourseService;
 import com.arazhafez.academe.service.EnrollmentService;
@@ -30,17 +31,16 @@ public class CourseController {
         this.enrollmentService = enrollmentService;
     }
 
-    //Instructor creates a new course
     @PostMapping
     @PreAuthorize("hasRole('INSTRUCTOR')")
-    public ResponseEntity<CourseResponse> createCourse(
+    public ResponseEntity<InstructorCourseResponse> createCourse(
             @Valid @RequestBody CreateCourseRequest request,
             Authentication authentication) {
 
         String instructorEmail =
                 authentication.getName();
 
-        CourseResponse createdCourse =
+        InstructorCourseResponse createdCourse =
                 courseService.createCourse(
                         request,
                         instructorEmail
@@ -51,7 +51,6 @@ public class CourseController {
                 .body(createdCourse);
     }
 
-    //Get all courses
     @GetMapping
     public ResponseEntity<List<CourseResponse>> getAllCourses() {
 
@@ -61,16 +60,15 @@ public class CourseController {
         return ResponseEntity.ok(courses);
     }
 
-    //Instructor gets only their own courses
     @GetMapping("/mine")
     @PreAuthorize("hasRole('INSTRUCTOR')")
-    public ResponseEntity<List<CourseResponse>> getMyCourses(
+    public ResponseEntity<List<InstructorCourseResponse>> getMyCourses(
             Authentication authentication) {
 
         String instructorEmail =
                 authentication.getName();
 
-        List<CourseResponse> courses =
+        List<InstructorCourseResponse> courses =
                 courseService.getMyCourses(
                         instructorEmail
                 );
@@ -78,7 +76,6 @@ public class CourseController {
         return ResponseEntity.ok(courses);
     }
 
-    //Instructor views students enrolled in one of their courses
     @GetMapping("/{courseId}/students")
     @PreAuthorize("hasRole('INSTRUCTOR')")
     public ResponseEntity<List<EnrollmentResponse>> getCourseStudents(
@@ -97,10 +94,9 @@ public class CourseController {
         return ResponseEntity.ok(students);
     }
 
-    //Instructor updates one of their own courses
     @PutMapping("/{courseId}")
     @PreAuthorize("hasRole('INSTRUCTOR')")
-    public ResponseEntity<CourseResponse> updateCourse(
+    public ResponseEntity<InstructorCourseResponse> updateCourse(
             @PathVariable Long courseId,
             @Valid @RequestBody UpdateCourseRequest request,
             Authentication authentication) {
@@ -108,7 +104,7 @@ public class CourseController {
         String instructorEmail =
                 authentication.getName();
 
-        CourseResponse updatedCourse =
+        InstructorCourseResponse updatedCourse =
                 courseService.updateCourse(
                         courseId,
                         request,
@@ -118,7 +114,6 @@ public class CourseController {
         return ResponseEntity.ok(updatedCourse);
     }
 
-    //Instructor deletes one of their own courses
     @DeleteMapping("/{courseId}")
     @PreAuthorize("hasRole('INSTRUCTOR')")
     public ResponseEntity<Void> deleteCourse(
@@ -136,7 +131,6 @@ public class CourseController {
         return ResponseEntity.noContent().build();
     }
 
-    //Get one course by its ID
     @GetMapping("/{id}")
     public ResponseEntity<CourseResponse> getCourseById(
             @PathVariable Long id) {

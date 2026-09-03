@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 
 @Getter
 @AllArgsConstructor
-public class CourseResponse {
+public class InstructorCourseResponse {
 
     private Long id;
     private String courseCode;
@@ -15,6 +15,8 @@ public class CourseResponse {
     private String description;
     private String semester;
     private Integer credits;
+
+    private String joinCode;
 
     private Long instructorId;
     private String instructorFirstName;

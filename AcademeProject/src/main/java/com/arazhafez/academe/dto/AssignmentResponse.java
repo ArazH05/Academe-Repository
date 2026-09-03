@@ -7,18 +7,17 @@ import java.time.LocalDateTime;
 
 @Getter
 @AllArgsConstructor
-public class CourseResponse {
+public class AssignmentResponse {
 
     private Long id;
-    private String courseCode;
     private String title;
     private String description;
-    private String semester;
-    private Integer credits;
+    private LocalDateTime dueDate;
+    private Integer maxPoints;
 
-    private Long instructorId;
-    private String instructorFirstName;
-    private String instructorLastName;
+    private Long courseId;
+    private String courseCode;
+    private String courseTitle;
 
     private LocalDateTime createdAt;
 }

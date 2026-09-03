@@ -2,6 +2,7 @@ package com.arazhafez.academe.service;
 
 import com.arazhafez.academe.dto.CourseResponse;
 import com.arazhafez.academe.dto.CreateCourseRequest;
+import com.arazhafez.academe.dto.InstructorCourseResponse;
 import com.arazhafez.academe.dto.UpdateCourseRequest;
 import com.arazhafez.academe.entity.Course;
 import com.arazhafez.academe.entity.User;
@@ -34,7 +35,7 @@ public class CourseService {
         this.enrollmentRepository = enrollmentRepository;
     }
 
-    public CourseResponse createCourse(
+    public InstructorCourseResponse createCourse(
             CreateCourseRequest request,
             String instructorEmail) {
 
@@ -85,7 +86,7 @@ public class CourseService {
         Course savedCourse =
                 courseRepository.save(course);
 
-        return toCourseResponse(savedCourse);
+        return toInstructorCourseResponse(savedCourse);
     }
 
     public List<CourseResponse> getAllCourses() {
@@ -110,7 +111,7 @@ public class CourseService {
         return toCourseResponse(course);
     }
 
-    public List<CourseResponse> getMyCourses(
+    public List<InstructorCourseResponse> getMyCourses(
             String instructorEmail) {
 
         User instructor = userRepository
@@ -130,11 +131,11 @@ public class CourseService {
         return courseRepository
                 .findByInstructorId(instructor.getId())
                 .stream()
-                .map(this::toCourseResponse)
+                .map(this::toInstructorCourseResponse)
                 .toList();
     }
 
-    public CourseResponse updateCourse(
+    public InstructorCourseResponse updateCourse(
             Long courseId,
             UpdateCourseRequest request,
             String instructorEmail) {
@@ -203,7 +204,7 @@ public class CourseService {
         Course updatedCourse =
                 courseRepository.save(course);
 
-        return toCourseResponse(updatedCourse);
+        return toInstructorCourseResponse(updatedCourse);
     }
 
     @Transactional
@@ -248,6 +249,7 @@ public class CourseService {
         courseRepository.delete(course);
     }
 
+    // Used for general course information
     private CourseResponse toCourseResponse(
             Course course) {
 
@@ -258,6 +260,27 @@ public class CourseService {
                 course.getDescription(),
                 course.getSemester(),
                 course.getCredits(),
+
+                course.getInstructor().getId(),
+                course.getInstructor().getFirstName(),
+                course.getInstructor().getLastName(),
+
+                course.getCreatedAt()
+        );
+    }
+
+    // Used when the instructor needs the join code
+    private InstructorCourseResponse toInstructorCourseResponse(
+            Course course) {
+
+        return new InstructorCourseResponse(
+                course.getId(),
+                course.getCourseCode(),
+                course.getTitle(),
+                course.getDescription(),
+                course.getSemester(),
+                course.getCredits(),
+
                 course.getJoinCode(),
 
                 course.getInstructor().getId(),
