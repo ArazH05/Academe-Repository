@@ -9,4 +9,5 @@ public interface AssignmentRepository
         extends JpaRepository<Assignment, Long> {
 
     List<Assignment> findByCourseId(Long courseId);
+    void deleteAllByCourseId(Long courseId);
 }

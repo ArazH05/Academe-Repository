@@ -4,17 +4,20 @@ import com.arazhafez.academe.dto.CourseResponse;
 import com.arazhafez.academe.dto.CreateCourseRequest;
 import com.arazhafez.academe.dto.InstructorCourseResponse;
 import com.arazhafez.academe.dto.UpdateCourseRequest;
+import com.arazhafez.academe.entity.Assignment;
 import com.arazhafez.academe.entity.Course;
 import com.arazhafez.academe.entity.User;
 import com.arazhafez.academe.enums.Role;
 import com.arazhafez.academe.exception.BadRequestException;
 import com.arazhafez.academe.exception.ForbiddenException;
 import com.arazhafez.academe.exception.ResourceNotFoundException;
+import com.arazhafez.academe.repository.AssignmentRepository;
 import com.arazhafez.academe.repository.CourseRepository;
 import com.arazhafez.academe.repository.EnrollmentRepository;
+import com.arazhafez.academe.repository.SubmissionRepository;
 import com.arazhafez.academe.repository.UserRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -24,50 +27,42 @@ public class CourseService {
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final AssignmentRepository assignmentRepository;
+    private final SubmissionRepository submissionRepository;
 
     public CourseService(
             CourseRepository courseRepository,
             UserRepository userRepository,
-            EnrollmentRepository enrollmentRepository) {
+            EnrollmentRepository enrollmentRepository,
+            AssignmentRepository assignmentRepository,
+            SubmissionRepository submissionRepository) {
 
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.enrollmentRepository = enrollmentRepository;
+        this.assignmentRepository = assignmentRepository;
+        this.submissionRepository = submissionRepository;
     }
 
+    // Instructor creates a course
     public InstructorCourseResponse createCourse(
             CreateCourseRequest request,
             String instructorEmail) {
 
-        User instructor = userRepository
-                .findByEmail(instructorEmail)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Instructor not found"
-                        )
-                );
+        User instructor =
+                getInstructor(instructorEmail);
 
-        if (instructor.getRole() != Role.INSTRUCTOR) {
-            throw new ForbiddenException(
-                    "Only instructors can create courses"
-            );
-        }
+        if (courseRepository.existsByCourseCode(
+                request.getCourseCode())) {
 
-        String courseCode = request.getCourseCode()
-                .trim()
-                .toUpperCase();
-
-        String joinCode = request.getJoinCode()
-                .trim()
-                .toUpperCase();
-
-        if (courseRepository.existsByCourseCode(courseCode)) {
             throw new BadRequestException(
                     "Course code already exists"
             );
         }
 
-        if (courseRepository.existsByJoinCode(joinCode)) {
+        if (courseRepository.existsByJoinCode(
+                request.getJoinCode())) {
+
             throw new BadRequestException(
                     "Join code already exists"
             );
@@ -75,20 +70,44 @@ public class CourseService {
 
         Course course = new Course();
 
-        course.setCourseCode(courseCode);
-        course.setTitle(request.getTitle().trim());
-        course.setDescription(request.getDescription());
-        course.setSemester(request.getSemester().trim());
-        course.setCredits(request.getCredits());
-        course.setJoinCode(joinCode);
-        course.setInstructor(instructor);
+        course.setCourseCode(
+                request.getCourseCode()
+        );
+
+        course.setTitle(
+                request.getTitle()
+        );
+
+        course.setDescription(
+                request.getDescription()
+        );
+
+        course.setSemester(
+                request.getSemester()
+        );
+
+        course.setCredits(
+                request.getCredits()
+        );
+
+        course.setJoinCode(
+                request.getJoinCode()
+        );
+
+        course.setInstructor(
+                instructor
+        );
 
         Course savedCourse =
                 courseRepository.save(course);
 
-        return toInstructorCourseResponse(savedCourse);
+        return toInstructorCourseResponse(
+                savedCourse
+        );
     }
 
+    // Authenticated users can view courses
+    // Join code is intentionally hidden
     public List<CourseResponse> getAllCourses() {
 
         return courseRepository
@@ -98,10 +117,13 @@ public class CourseService {
                 .toList();
     }
 
-    public CourseResponse getCourseById(Long id) {
+    // Get one course
+    // Join code is intentionally hidden
+    public CourseResponse getCourseById(
+            Long courseId) {
 
         Course course = courseRepository
-                .findById(id)
+                .findById(courseId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "Course not found"
@@ -111,48 +133,31 @@ public class CourseService {
         return toCourseResponse(course);
     }
 
+    // Instructor views their own courses
+    // Join code is included
     public List<InstructorCourseResponse> getMyCourses(
             String instructorEmail) {
 
-        User instructor = userRepository
-                .findByEmail(instructorEmail)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Instructor not found"
-                        )
-                );
-
-        if (instructor.getRole() != Role.INSTRUCTOR) {
-            throw new ForbiddenException(
-                    "Only instructors can view their courses"
-            );
-        }
+        User instructor =
+                getInstructor(instructorEmail);
 
         return courseRepository
-                .findByInstructorId(instructor.getId())
+                .findByInstructorId(
+                        instructor.getId()
+                )
                 .stream()
                 .map(this::toInstructorCourseResponse)
                 .toList();
     }
 
+    // Instructor updates their own course
     public InstructorCourseResponse updateCourse(
             Long courseId,
             UpdateCourseRequest request,
             String instructorEmail) {
 
-        User instructor = userRepository
-                .findByEmail(instructorEmail)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Instructor not found"
-                        )
-                );
-
-        if (instructor.getRole() != Role.INSTRUCTOR) {
-            throw new ForbiddenException(
-                    "Only instructors can update courses"
-            );
-        }
+        User instructor =
+                getInstructor(instructorEmail);
 
         Course course = courseRepository
                 .findById(courseId)
@@ -162,54 +167,87 @@ public class CourseService {
                         )
                 );
 
-        if (!course.getInstructor().getId()
-                .equals(instructor.getId())) {
+        verifyCourseOwnership(
+                course,
+                instructor
+        );
 
-            throw new ForbiddenException(
-                    "You are not the instructor of this course"
-            );
-        }
+        course.setTitle(
+                request.getTitle()
+        );
 
-        String courseCode = request.getCourseCode()
-                .trim()
-                .toUpperCase();
+        course.setDescription(
+                request.getDescription()
+        );
 
-        String joinCode = request.getJoinCode()
-                .trim()
-                .toUpperCase();
+        course.setSemester(
+                request.getSemester()
+        );
 
-        if (!course.getCourseCode().equals(courseCode)
-                && courseRepository.existsByCourseCode(courseCode)) {
-
-            throw new BadRequestException(
-                    "Course code already exists"
-            );
-        }
-
-        if (!course.getJoinCode().equals(joinCode)
-                && courseRepository.existsByJoinCode(joinCode)) {
-
-            throw new BadRequestException(
-                    "Join code already exists"
-            );
-        }
-
-        course.setCourseCode(courseCode);
-        course.setTitle(request.getTitle().trim());
-        course.setDescription(request.getDescription());
-        course.setSemester(request.getSemester().trim());
-        course.setCredits(request.getCredits());
-        course.setJoinCode(joinCode);
+        course.setCredits(
+                request.getCredits()
+        );
 
         Course updatedCourse =
                 courseRepository.save(course);
 
-        return toInstructorCourseResponse(updatedCourse);
+        return toInstructorCourseResponse(
+                updatedCourse
+        );
     }
 
+    // Instructor deletes their own course
     @Transactional
     public void deleteCourse(
             Long courseId,
+            String instructorEmail) {
+
+        User instructor =
+                getInstructor(instructorEmail);
+
+        Course course = courseRepository
+                .findById(courseId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Course not found"
+                        )
+                );
+
+        verifyCourseOwnership(
+                course,
+                instructor
+        );
+
+        // Get all assignments in the course
+        List<Assignment> assignments =
+                assignmentRepository
+                        .findByCourseId(courseId);
+
+        // Delete submissions first
+        for (Assignment assignment : assignments) {
+
+            submissionRepository
+                    .deleteAllByAssignmentId(
+                            assignment.getId()
+                    );
+        }
+
+        // Delete assignments
+        assignmentRepository
+                .deleteAllByCourseId(courseId);
+
+        // Delete enrollments
+        enrollmentRepository.deleteAll(
+                enrollmentRepository
+                        .findByCourseId(courseId)
+        );
+
+        // Finally delete the course
+        courseRepository.delete(course);
+    }
+
+    // Finds and validates instructor
+    private User getInstructor(
             String instructorEmail) {
 
         User instructor = userRepository
@@ -220,36 +258,34 @@ public class CourseService {
                         )
                 );
 
-        if (instructor.getRole() != Role.INSTRUCTOR) {
+        if (instructor.getRole()
+                != Role.INSTRUCTOR) {
+
             throw new ForbiddenException(
-                    "Only instructors can delete courses"
+                    "Only instructors can perform this action"
             );
         }
 
-        Course course = courseRepository
-                .findById(courseId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Course not found"
-                        )
-                );
+        return instructor;
+    }
 
-        if (!course.getInstructor().getId()
+    // Makes sure instructor owns the course
+    private void verifyCourseOwnership(
+            Course course,
+            User instructor) {
+
+        if (!course.getInstructor()
+                .getId()
                 .equals(instructor.getId())) {
 
             throw new ForbiddenException(
                     "You are not the instructor of this course"
             );
         }
-
-        enrollmentRepository.deleteAll(
-                enrollmentRepository.findByCourseId(courseId)
-        );
-
-        courseRepository.delete(course);
     }
 
-    // Used for general course information
+    // Public/student course response
+    // Does not expose join code
     private CourseResponse toCourseResponse(
             Course course) {
 
@@ -269,8 +305,10 @@ public class CourseService {
         );
     }
 
-    // Used when the instructor needs the join code
-    private InstructorCourseResponse toInstructorCourseResponse(
+    // Instructor response
+    // Includes join code
+    private InstructorCourseResponse
+    toInstructorCourseResponse(
             Course course) {
 
         return new InstructorCourseResponse(
@@ -280,7 +318,6 @@ public class CourseService {
                 course.getDescription(),
                 course.getSemester(),
                 course.getCredits(),
-
                 course.getJoinCode(),
 
                 course.getInstructor().getId(),

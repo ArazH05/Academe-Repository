@@ -43,6 +43,11 @@ public class Submission {
     @JoinColumn(name = "student_id", nullable = false)
     private User student;
 
+    private Integer grade; //grade given by instructor
+
+    @Column(length = 3000)
+    private String feedback; //feedback given by instructor, 3000 character limit
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime submittedAt;
 

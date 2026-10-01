@@ -16,5 +16,7 @@ public class SubmissionResponse {
     private String studentLastName;
     private String content;
     private String fileUrl;
+    private Integer grade;
+    private String feedback;
     private LocalDateTime submittedAt;
 }

@@ -26,4 +26,6 @@ public interface SubmissionRepository
     List<Submission> findByStudentId(
             Long studentId
     );
+
+    void deleteAllByAssignmentId(Long assignmentId);
 }

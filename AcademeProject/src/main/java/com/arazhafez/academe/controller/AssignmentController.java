@@ -25,6 +25,7 @@ public class AssignmentController {
         this.assignmentService = assignmentService;
     }
 
+    // Instructor creates an assignment
     @PostMapping("/courses/{courseId}/assignments")
     @PreAuthorize("hasRole('INSTRUCTOR')")
     public ResponseEntity<AssignmentResponse> createAssignment(
@@ -47,30 +48,44 @@ public class AssignmentController {
                 .body(assignment);
     }
 
+    // Student or instructor views assignments for a course
     @GetMapping("/courses/{courseId}/assignments")
     public ResponseEntity<List<AssignmentResponse>>
     getAssignmentsByCourse(
-            @PathVariable Long courseId) {
+            @PathVariable Long courseId,
+            Authentication authentication) {
+
+        String userEmail =
+                authentication.getName();
 
         List<AssignmentResponse> assignments =
                 assignmentService.getAssignmentsByCourse(
-                        courseId
+                        courseId,
+                        userEmail
                 );
 
         return ResponseEntity.ok(assignments);
     }
 
+    // Student or instructor views one assignment
     @GetMapping("/assignments/{assignmentId}")
     public ResponseEntity<AssignmentResponse> getAssignmentById(
-            @PathVariable Long assignmentId) {
+            @PathVariable Long assignmentId,
+            Authentication authentication) {
+
+        String userEmail =
+                authentication.getName();
 
         AssignmentResponse assignment =
                 assignmentService.getAssignmentById(
-                        assignmentId
+                        assignmentId,
+                        userEmail
                 );
 
         return ResponseEntity.ok(assignment);
     }
+
+    // Instructor updates an assignment
     @PutMapping("/assignments/{assignmentId}")
     @PreAuthorize("hasRole('INSTRUCTOR')")
     public ResponseEntity<AssignmentResponse> updateAssignment(
@@ -91,6 +106,7 @@ public class AssignmentController {
         return ResponseEntity.ok(assignment);
     }
 
+    // Instructor deletes an assignment
     @DeleteMapping("/assignments/{assignmentId}")
     @PreAuthorize("hasRole('INSTRUCTOR')")
     public ResponseEntity<Void> deleteAssignment(
@@ -105,6 +121,8 @@ public class AssignmentController {
                 instructorEmail
         );
 
-        return ResponseEntity.noContent().build();
+        return ResponseEntity
+                .noContent()
+                .build();
     }
 }

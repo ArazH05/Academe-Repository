@@ -12,7 +12,10 @@ import com.arazhafez.academe.exception.ForbiddenException;
 import com.arazhafez.academe.exception.ResourceNotFoundException;
 import com.arazhafez.academe.repository.AssignmentRepository;
 import com.arazhafez.academe.repository.CourseRepository;
+import com.arazhafez.academe.repository.EnrollmentRepository;
+import com.arazhafez.academe.repository.SubmissionRepository;
 import com.arazhafez.academe.repository.UserRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -24,15 +27,21 @@ public class AssignmentService {
     private final AssignmentRepository assignmentRepository;
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final SubmissionRepository submissionRepository;
 
     public AssignmentService(
             AssignmentRepository assignmentRepository,
             CourseRepository courseRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            EnrollmentRepository enrollmentRepository,
+            SubmissionRepository submissionRepository) {
 
         this.assignmentRepository = assignmentRepository;
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
+        this.enrollmentRepository = enrollmentRepository;
+        this.submissionRepository = submissionRepository;
     }
 
     public AssignmentResponse createAssignment(
@@ -40,7 +49,8 @@ public class AssignmentService {
             CreateAssignmentRequest request,
             String instructorEmail) {
 
-        User instructor = getInstructor(instructorEmail);
+        User instructor =
+                getInstructor(instructorEmail);
 
         Course course = courseRepository
                 .findById(courseId)
@@ -50,36 +60,69 @@ public class AssignmentService {
                         )
                 );
 
-        verifyCourseOwnership(course, instructor);
+        verifyCourseOwnership(
+                course,
+                instructor
+        );
 
-        if (request.getDueDate().isBefore(LocalDateTime.now())) {
+        if (request.getDueDate()
+                .isBefore(LocalDateTime.now())) {
+
             throw new BadRequestException(
                     "Due date must be in the future"
             );
         }
 
-        Assignment assignment = new Assignment();
+        Assignment assignment =
+                new Assignment();
 
-        assignment.setTitle(request.getTitle().trim());
-        assignment.setDescription(request.getDescription());
-        assignment.setDueDate(request.getDueDate());
-        assignment.setMaxPoints(request.getMaxPoints());
-        assignment.setCourse(course);
+        assignment.setTitle(
+                request.getTitle().trim()
+        );
+
+        assignment.setDescription(
+                request.getDescription()
+        );
+
+        assignment.setDueDate(
+                request.getDueDate()
+        );
+
+        assignment.setMaxPoints(
+                request.getMaxPoints()
+        );
+
+        assignment.setCourse(
+                course
+        );
 
         Assignment savedAssignment =
                 assignmentRepository.save(assignment);
 
-        return toAssignmentResponse(savedAssignment);
+        return toAssignmentResponse(
+                savedAssignment
+        );
     }
 
     public List<AssignmentResponse> getAssignmentsByCourse(
-            Long courseId) {
+            Long courseId,
+            String userEmail) {
 
-        if (!courseRepository.existsById(courseId)) {
-            throw new ResourceNotFoundException(
-                    "Course not found"
-            );
-        }
+        User user =
+                getUser(userEmail);
+
+        Course course = courseRepository
+                .findById(courseId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Course not found"
+                        )
+                );
+
+        verifyAssignmentAccess(
+                course,
+                user
+        );
 
         return assignmentRepository
                 .findByCourseId(courseId)
@@ -89,17 +132,29 @@ public class AssignmentService {
     }
 
     public AssignmentResponse getAssignmentById(
-            Long assignmentId) {
+            Long assignmentId,
+            String userEmail) {
 
-        Assignment assignment = assignmentRepository
-                .findById(assignmentId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Assignment not found"
-                        )
-                );
+        User user =
+                getUser(userEmail);
 
-        return toAssignmentResponse(assignment);
+        Assignment assignment =
+                assignmentRepository
+                        .findById(assignmentId)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Assignment not found"
+                                )
+                        );
+
+        verifyAssignmentAccess(
+                assignment.getCourse(),
+                user
+        );
+
+        return toAssignmentResponse(
+                assignment
+        );
     }
 
     public AssignmentResponse updateAssignment(
@@ -107,22 +162,26 @@ public class AssignmentService {
             UpdateAssignmentRequest request,
             String instructorEmail) {
 
-        User instructor = getInstructor(instructorEmail);
+        User instructor =
+                getInstructor(instructorEmail);
 
-        Assignment assignment = assignmentRepository
-                .findById(assignmentId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Assignment not found"
-                        )
-                );
+        Assignment assignment =
+                assignmentRepository
+                        .findById(assignmentId)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Assignment not found"
+                                )
+                        );
 
         verifyCourseOwnership(
                 assignment.getCourse(),
                 instructor
         );
 
-        if (request.getDueDate().isBefore(LocalDateTime.now())) {
+        if (request.getDueDate()
+                .isBefore(LocalDateTime.now())) {
+
             throw new BadRequestException(
                     "Due date must be in the future"
             );
@@ -147,43 +206,71 @@ public class AssignmentService {
         Assignment updatedAssignment =
                 assignmentRepository.save(assignment);
 
-        return toAssignmentResponse(updatedAssignment);
+        return toAssignmentResponse(
+                updatedAssignment
+        );
     }
 
+    @Transactional
     public void deleteAssignment(
             Long assignmentId,
             String instructorEmail) {
 
-        User instructor = getInstructor(instructorEmail);
+        User instructor =
+                getInstructor(instructorEmail);
 
-        Assignment assignment = assignmentRepository
-                .findById(assignmentId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Assignment not found"
-                        )
-                );
+        Assignment assignment =
+                assignmentRepository
+                        .findById(assignmentId)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Assignment not found"
+                                )
+                        );
 
         verifyCourseOwnership(
                 assignment.getCourse(),
                 instructor
         );
 
-        assignmentRepository.delete(assignment);
+        // Delete submissions before deleting assignment
+        submissionRepository
+                .deleteAllByAssignmentId(
+                        assignmentId
+                );
+
+        assignmentRepository.delete(
+                assignment
+        );
+    }
+
+    private User getUser(
+            String userEmail) {
+
+        return userRepository
+                .findByEmail(userEmail)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "User not found"
+                        )
+                );
     }
 
     private User getInstructor(
             String instructorEmail) {
 
-        User instructor = userRepository
-                .findByEmail(instructorEmail)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Instructor not found"
-                        )
-                );
+        User instructor =
+                userRepository
+                        .findByEmail(instructorEmail)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Instructor not found"
+                                )
+                        );
 
-        if (instructor.getRole() != Role.INSTRUCTOR) {
+        if (instructor.getRole()
+                != Role.INSTRUCTOR) {
+
             throw new ForbiddenException(
                     "Only instructors can manage assignments"
             );
@@ -192,11 +279,52 @@ public class AssignmentService {
         return instructor;
     }
 
+    private void verifyAssignmentAccess(
+            Course course,
+            User user) {
+
+        // Instructor can only access assignments
+        // belonging to their own course
+        if (user.getRole() == Role.INSTRUCTOR) {
+
+            verifyCourseOwnership(
+                    course,
+                    user
+            );
+
+            return;
+        }
+
+        // Student must be enrolled
+        if (user.getRole() == Role.STUDENT) {
+
+            boolean enrolled =
+                    enrollmentRepository
+                            .existsByStudentIdAndCourseId(
+                                    user.getId(),
+                                    course.getId()
+                            );
+
+            if (!enrolled) {
+                throw new ForbiddenException(
+                        "You are not enrolled in this course"
+                );
+            }
+
+            return;
+        }
+
+        throw new ForbiddenException(
+                "You do not have access to these assignments"
+        );
+    }
+
     private void verifyCourseOwnership(
             Course course,
             User instructor) {
 
-        if (!course.getInstructor().getId()
+        if (!course.getInstructor()
+                .getId()
                 .equals(instructor.getId())) {
 
             throw new ForbiddenException(

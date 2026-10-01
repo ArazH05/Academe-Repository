@@ -1,7 +1,9 @@
 package com.arazhafez.academe.controller;
 
 import com.arazhafez.academe.dto.CreateSubmissionRequest;
+import com.arazhafez.academe.dto.GradeSubmissionRequest;
 import com.arazhafez.academe.dto.SubmissionResponse;
+import com.arazhafez.academe.dto.UpdateSubmissionRequest;
 import com.arazhafez.academe.service.SubmissionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -24,6 +26,7 @@ public class SubmissionController {
         this.submissionService = submissionService;
     }
 
+    // Student creates a submission
     @PostMapping("/assignments/{assignmentId}/submissions")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<SubmissionResponse> createSubmission(
@@ -31,14 +34,11 @@ public class SubmissionController {
             @Valid @RequestBody CreateSubmissionRequest request,
             Authentication authentication) {
 
-        String studentEmail =
-                authentication.getName();
-
         SubmissionResponse submission =
                 submissionService.createSubmission(
                         assignmentId,
                         request,
-                        studentEmail
+                        authentication.getName()
                 );
 
         return ResponseEntity
@@ -46,19 +46,71 @@ public class SubmissionController {
                 .body(submission);
     }
 
+    // Student views their own submissions
     @GetMapping("/submissions/me")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<List<SubmissionResponse>>
-    getMySubmissions(Authentication authentication) {
-
-        String studentEmail =
-                authentication.getName();
+    getMySubmissions(
+            Authentication authentication) {
 
         List<SubmissionResponse> submissions =
                 submissionService.getMySubmissions(
-                        studentEmail
+                        authentication.getName()
                 );
 
         return ResponseEntity.ok(submissions);
+    }
+
+    // Student updates their own submission
+    @PutMapping("/submissions/{submissionId}")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<SubmissionResponse> updateSubmission(
+            @PathVariable Long submissionId,
+            @Valid @RequestBody UpdateSubmissionRequest request,
+            Authentication authentication) {
+
+        SubmissionResponse submission =
+                submissionService.updateSubmission(
+                        submissionId,
+                        request,
+                        authentication.getName()
+                );
+
+        return ResponseEntity.ok(submission);
+    }
+
+    // Instructor views all submissions for an assignment
+    @GetMapping("/assignments/{assignmentId}/submissions")
+    @PreAuthorize("hasRole('INSTRUCTOR')")
+    public ResponseEntity<List<SubmissionResponse>>
+    getAssignmentSubmissions(
+            @PathVariable Long assignmentId,
+            Authentication authentication) {
+
+        List<SubmissionResponse> submissions =
+                submissionService.getAssignmentSubmissions(
+                        assignmentId,
+                        authentication.getName()
+                );
+
+        return ResponseEntity.ok(submissions);
+    }
+
+    // Instructor grades a submission
+    @PutMapping("/submissions/{submissionId}/grade")
+    @PreAuthorize("hasRole('INSTRUCTOR')")
+    public ResponseEntity<SubmissionResponse> gradeSubmission(
+            @PathVariable Long submissionId,
+            @Valid @RequestBody GradeSubmissionRequest request,
+            Authentication authentication) {
+
+        SubmissionResponse submission =
+                submissionService.gradeSubmission(
+                        submissionId,
+                        request,
+                        authentication.getName()
+                );
+
+        return ResponseEntity.ok(submission);
     }
 }
